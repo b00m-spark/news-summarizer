@@ -82,7 +82,7 @@ class AssistantManager:
         self.run = None
         self.summary = None
 
-        # If AssistantManager already has an assistant_id or thread_id, retrieve them
+        # If AssistantManager already has an assistant_id or thread_id, retrieve the assistant or thread
         if AssistantManager.assistant_id:
             self.assistant = self.client.beta.assistants.retrieve(
                 assistant_id= AssistantManager.assistant_id
@@ -106,7 +106,35 @@ class AssistantManager:
             # Now that we have an assistant, set self.assistant and self.assistant_id
             AssistantManager.assistant_id = assistant_obj.id
             self.assistant = assistant_obj
-            print(f"Created assistant with ID: {self.assistant_id}")
+            print(f"Created assistant with ID: {self.assistant.id}")
+    
+    def create_thread(self):
+
+        # If we don't have a thread yet, create one using our client
+        if not self.thread:
+            thread_obj = self.client.beta.threads.create()
+
+            # Now that we have a new thread, set self.
+            AssistantManager.thread_id = thread_obj.id
+            self.thread = thread_obj
+            print(f"Created thread with ID {self.thread.id}")
+    
+    def add_message_to_thread(self, role, content):
+        if self.thread:
+            self.client.beta.threads.messages.create(
+                thread_id = self.thread.id,
+                role = role,
+                content = content
+            )
+    
+
+    def run_assistant(self, instructions):
+        if self.thread and self.assistant:
+            self.run = self.client.beta.threads.runs.create(
+                thread_id = self.thread.id,
+                assistant_id = self.assistant.id,
+                instructions = instructions
+            )
 
 if __name__ == "__main__":
     main()
