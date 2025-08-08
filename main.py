@@ -136,5 +136,77 @@ class AssistantManager:
                 instructions = instructions
             )
 
+    def process_message(self):
+        if self.thread:
+            # Get list of all messages inside thread
+            messages = self.client.beta.threads.messages.list(
+                thread_id = self.thread.id
+            )
+            summary = []
+            
+            # Get the latest message
+            last_message = messages.data[0]
+            role = last_message.role
+            response = last_message.content[0].text.value
+
+            # Append its response to the summary list
+            summary.append(response)
+            self.summary = "\n".join(summary)
+
+            print(f"SUMMARY as {role.capitalize()}: ====> {response}")
+
+    def call_required_functions(self, required_actions):
+        if not self.run:
+            return
+        tool_outputs = []
+
+        # In required_actions->tool_calls, there's a list (in this case only one) of 
+        # tools (functions) that the assistant requires us to call
+        for action in required_actions["tool_calls"]:
+
+            # Get function name and arguments for each
+            func_name = action["function"]["name"]
+            arguments = json.loads(action["function"]["arguments"])
+
+            # If function name is get_news, we call get_news with the topic the assistant passed in
+            if func_name == "get_news":
+                output = get_news(topic= arguments["topic"])
+                print(f"get_news returns: {output}")
+                final_str = ""
+                for item in output:
+                    final_str += "".join(item)
+                
+                # The final result is the get_news output with the id of this required action 
+                tool_outputs.append({"tool_call_id": action["id"],
+                                     "output": final_str})
+            else:
+                raise ValueError(f"Unknown function: {func_name}")
+                
+        print("Submitting outputs back to the assistant ...")
+        self.client.beta.threads.runs.submit_tool_outputs(
+            thread_id= self.thread.id,
+            run_id= self.run.id,
+            tool_outputs= tool_outputs
+        )
+
+
+    def wait_for_completion(self):
+
+        if self.thread and self.run:
+            while True:
+                time.sleep(5)
+                run_status = self.client.beta.threads.runs.retrieve(
+                    thread_id= self.thread.id,
+                    run_id= self.run.id
+                )
+                print(f"RUN STATUS: {run_status.model_dump_json(indent=4)}")
+
+                if run_status.status == "completed":
+                    self.process_message()
+                # If the status becomes requires_action, we proceed to call functions according to its requirements
+                elif run_status.status == "requires_action":
+                    print("FUNCTION CALLING NOW ...")
+                    self.call_required_functions(required_actions= run_status.required_action.submit_tool_outputs.model_dump())
+
 if __name__ == "__main__":
     main()
