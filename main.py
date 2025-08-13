@@ -68,6 +68,9 @@ def get_news(topic):
 
 
 class AssistantManager:
+
+    # Change thread_id and assistant_id to values shown in RUN_STATUS after the first run 
+    # to avoid duplicating new assistants in future runs
     thread_id = None
     assistant_id = None
 
@@ -212,6 +215,12 @@ class AssistantManager:
                     print("FUNCTION CALLING NOW ...")
                     self.call_required_functions(required_actions= run_status.required_action.submit_tool_outputs.model_dump())
 
+    def run_steps(self):
+        run_steps= self.client.beta.threads.runs.steps.list(
+            thread_id= self.thread.id, run_id= self.run.id
+        )
+        return run_steps.data
+    
 def main():
     # result = get_news("gymnastics")
     # print(result)
@@ -263,8 +272,8 @@ def main():
             print(f"Summary --------> {summary}")
 
             st.write(summary)
-            # st.text("Run Steps: ")
-            # st.code(manager.run_steps(), line_numbers= True)
+            st.text("Run Steps: ")
+            st.code(manager.run_steps(), line_numbers= True)
 
 
 if __name__ == "__main__":
